@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dpp_recommender"
+version = "0.1.0"
+description = "A framework that recommends preprocessing strategies for multivariate time-series datasets based on Dataset Preprocessing Profiles (DPP)."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "mypy"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
