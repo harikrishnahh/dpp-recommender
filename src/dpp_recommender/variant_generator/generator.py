@@ -1,4 +1,4 @@
-import uuid
+import hashlib
 import numpy as np
 import pandas as pd
 from typing import List
@@ -87,14 +87,15 @@ def generate_variants(
     variants = []
     
     for ml in missingness_levels:
-        for _ in range(variants_per_level):
+        for variant_number in range(variants_per_level):
             # Record explicit child seed representing exactly how this variant frame mutated
             variant_seed = int(base_rng.integers(0, 1_000_000_000))
             
             variant_df = _inject_mcar(dataframe, predictors, ml, variant_seed)
             
-            # Using uuid for dataset keys 
-            variant_id = str(uuid.uuid4())
+            # Stable identifiers keep regenerated experiments byte-for-byte traceable.
+            identifier = f"{station_id}|{ml:.12g}|{variant_number}|{variant_seed}"
+            variant_id = hashlib.sha256(identifier.encode("utf-8")).hexdigest()[:24]
             
             variants.append(VariantDataset(
                 dataframe=variant_df,

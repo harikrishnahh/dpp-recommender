@@ -112,6 +112,34 @@ def _apply_strategy(
     return processed
 
 
+def _causal_test_fill(
+    train_series: pd.Series,
+    test_series: pd.Series,
+    predictor: str,
+    linear: bool,
+) -> pd.Series:
+    """Fill held-out values from training history and prior test values only."""
+    del predictor
+    train_valid = train_series.dropna()
+    if train_valid.empty:
+        raise ValueError("Causal test filling requires an observed training value.")
+
+    filled = test_series.copy()
+    first_observed = next(
+        (index for index, value in enumerate(filled) if pd.notna(value)), len(filled)
+    )
+    if linear and len(train_valid) >= 2:
+        slope = float(train_valid.iloc[-1] - train_valid.iloc[-2])
+        last_value = float(train_valid.iloc[-1])
+        for offset in range(first_observed):
+            if pd.isna(filled.iloc[offset]):
+                filled.iloc[offset] = last_value + slope * (offset + 1)
+    filled = filled.ffill()
+    if filled.isna().any():
+        filled = filled.fillna(float(train_valid.iloc[-1]))
+    return filled
+
+
 def _prepare_split(
     train_df: pd.DataFrame,
     test_df: pd.DataFrame,
@@ -129,7 +157,9 @@ def _prepare_split(
         test_prepared = test_df.copy()
         for predictor in predictors:
             train_prepared[predictor] = train_prepared[predictor].interpolate(method="linear", limit_direction="both")
-            test_prepared[predictor] = test_prepared[predictor].interpolate(method="linear", limit_direction="both")
+            test_prepared[predictor] = _causal_test_fill(
+                train_prepared[predictor], test_prepared[predictor], predictor, linear=True
+            )
         return train_prepared, test_prepared, None
 
     if strategy_name == "ffill_bfill":
@@ -137,7 +167,9 @@ def _prepare_split(
         test_prepared = test_df.copy()
         for predictor in predictors:
             train_prepared[predictor] = train_prepared[predictor].ffill().bfill()
-            test_prepared[predictor] = test_prepared[predictor].ffill().bfill()
+            test_prepared[predictor] = _causal_test_fill(
+                train_prepared[predictor], test_prepared[predictor], predictor, linear=False
+            )
         return train_prepared, test_prepared, None
 
     if strategy_name == "mean_impute":

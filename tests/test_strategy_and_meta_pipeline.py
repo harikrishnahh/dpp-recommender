@@ -66,6 +66,20 @@ def test_mean_imputation_is_fit_only_on_training_data():
     assert np.isclose(train_prepared["e"].mean(), 6.6666666667)
 
 
+def test_held_out_fills_do_not_use_future_test_values():
+    train_df = pd.DataFrame({"tp": [1.0, 2.0, 3.0], "e": [2.0, 3.0, 4.0], "p": [1.0, 1.0, 1.0]})
+    test_df = pd.DataFrame({"tp": [np.nan, np.nan, 100.0], "e": [np.nan, np.nan, 200.0], "p": [1.0, 1.0, 1.0]})
+    changed_test_df = test_df.copy()
+    changed_test_df.loc[2, ["tp", "e"]] = [1000.0, 2000.0]
+
+    for strategy in ["linear_interpolate", "ffill_bfill"]:
+        _, prepared, _ = _prepare_split(train_df, test_df, ["tp", "e"], strategy)
+        _, changed_prepared, _ = _prepare_split(train_df, changed_test_df, ["tp", "e"], strategy)
+        assert prepared.loc[0, "tp"] == changed_prepared.loc[0, "tp"]
+        assert prepared.loc[1, "tp"] == changed_prepared.loc[1, "tp"]
+        assert prepared[["tp", "e"]].notna().all().all()
+
+
 def test_recommendation_split_is_variant_level_and_deterministic():
     variants = [_make_variant(f"variant-{i}") for i in range(1, 7)]
     benchmark = evaluate_strategy_benchmark(variants, ["tp", "e"], "p")
